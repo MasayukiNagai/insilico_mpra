@@ -19,6 +19,13 @@ notify_job_start
 
 set -e
 
+CONFIG_IDX=$1
+if [ -z "$CONFIG_IDX" ]; then
+    echo "Usage: $0 <config_index>"
+    exit 1
+fi
+CONFIG_FILE="./configs/config${CONFIG_IDX}.json"
+
 PROJ_DIR=/grid/koo/home/nagai/projects/continual_learning/insilico_mpra
 PYTHON=${PROJ_DIR}/.venv/bin/python
 
@@ -36,7 +43,7 @@ echo "Project directory: $PROJ_DIR"
 # Navigate to your project directory
 cd "$PROJ_DIR"
 
-$PYTHON train.py --config ./configs/config9.json
+$PYTHON train.py --config "$CONFIG_FILE"
 
 # Custom command to send notifications to Slack
 notify_job_end

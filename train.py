@@ -35,9 +35,9 @@ def parse_arguments():
     parser.add_argument('--epochs', type=int, help='Number of training epochs')
     parser.add_argument('--batch_size', type=int, help='Training batch size')
     parser.add_argument('--learning_rate', type=float, help='Maximum learning rate')
-    parser.add_argument('--device', type=int, default=0, help='GPU device ID')
-    parser.add_argument('--seed', type=int, default=777, help='Random seed')
-    parser.add_argument('--num_workers', type=int, default=8, help='Number of data loading workers')
+    parser.add_argument('--device', type=int, help='GPU device ID')
+    parser.add_argument('--seed', type=int, help='Random seed')
+    parser.add_argument('--num_workers', type=int, help='Number of data loading workers')
 
     # Model parameters
     parser.add_argument('--stem_ch', type=int, help='Stem channels')
@@ -122,6 +122,7 @@ def setup_callbacks(config):
 def train_model(config, data_file, data_format='h5'):
     """Train the model with given configuration."""
     # Set random seed
+    print(f"Setting global seed: {config.seed}")
     set_global_seed(config.seed)
 
     # Set PyTorch precision
