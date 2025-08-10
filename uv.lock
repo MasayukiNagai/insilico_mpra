@@ -1033,6 +1033,7 @@ dependencies = [
     { name = "scikit-learn" },
     { name = "scipy" },
     { name = "seaborn" },
+    { name = "squid-nn" },
     { name = "torch" },
     { name = "torchmetrics" },
 ]
@@ -1052,6 +1053,7 @@ requires-dist = [
     { name = "scikit-learn", specifier = ">=1.0.0" },
     { name = "scipy", specifier = ">=1.7.0" },
     { name = "seaborn", specifier = ">=0.11.0" },
+    { name = "squid-nn", specifier = ">=0.4.8" },
     { name = "torch", specifier = "==2.5.1" },
     { name = "torchmetrics", specifier = "==0.11.4" },
 ]
@@ -3138,6 +3140,21 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/3f/f4/4a80cd6ef364b2e8b65b15816a843c0980f7a5a2b4dc701fc574952aa19f/soupsieve-2.7.tar.gz", hash = "sha256:ad282f9b6926286d2ead4750552c8a6142bc4c783fd66b0293547c8fe6ae126a", size = 103418 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e7/9c/0e6afc12c269578be5c0c1c9f4b49a8d32770a080260c333ac04cc1c832d/soupsieve-2.7-py3-none-any.whl", hash = "sha256:6e60cc5c1ffaf1cebcc12e8188320b72071e922c2e897f737cadce79ad5d30c4", size = 36677 },
+]
+
+[[package]]
+name = "squid-nn"
+version = "0.4.8"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/de/db/3be4132682516ea63c474a3945d8bd5ebcb875b59132a08e770e0d9b4c29/squid_nn-0.4.8.tar.gz", hash = "sha256:63bb1c91e04a9c77ca8c0d84bb3f1cb4f117ffb9d5df52ff1c1166386cc5f4de", size = 26308 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9c/58/577889350734a6128a251b6f4ca61deeef9a3238a94099f1cc354e0add55/squid_nn-0.4.8-py3-none-any.whl", hash = "sha256:d74624a698ae7fda19fd38bb4d3065c4834c67649936214b5670520f71592429", size = 26699 },
 ]
 
 [[package]]

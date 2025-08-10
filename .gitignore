@@ -222,3 +222,11 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,python,linux
+
+out/
+results/
+results_rc/
+model_weight/
+*.h5
+*.png
+configs/

@@ -14,10 +14,10 @@ import lightning.pytorch as pl
 from pathlib import Path
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 
-from mpralegnet.config import TrainingConfig, get_default_config
-from mpralegnet.models.lightning_module import LitModel
-from mpralegnet.data.utils import create_dataloaders, check_h5_dataset
-from mpralegnet.utils.model_utils import set_global_seed, parameter_count
+from insilico_mpra.config import TrainingConfig, get_default_config
+from insilico_mpra.models.lightning_module import LitModel
+from insilico_mpra.data.utils import create_dataloaders, check_h5_dataset
+from insilico_mpra.utils.model_utils import set_global_seed, parameter_count
 
 
 def parse_arguments():

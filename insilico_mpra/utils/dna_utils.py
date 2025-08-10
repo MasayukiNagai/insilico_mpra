@@ -79,3 +79,10 @@ class Seq2Tensor(nn.Module):
         code[code[:, 4] == 1] = 0.25  # encode Ns with .25
         code = code[:, :4].float()
         return code.transpose(0, 1)
+
+
+def seq2onehot(seq: str) -> np.ndarray:
+    """Convert a DNA sequence string to one-hot encoded format."""
+    seq_tensor = Seq2Tensor()
+    encoded = seq_tensor(seq)  # Shape: (4, length)
+    return encoded.numpy()

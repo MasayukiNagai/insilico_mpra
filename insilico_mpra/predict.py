@@ -5,11 +5,11 @@ import lightning.pytorch as pl
 from pathlib import Path
 from torch.utils.data import DataLoader, Dataset
 
-from mpralegnet.config import TrainingConfig
-from mpralegnet.models.lightning_module import LitModel
-from mpralegnet.data.datasets import HDF5Dataset
-from mpralegnet.data.utils import create_test_dataloader
-from mpralegnet.utils.dna_utils import Seq2Tensor
+from insilico_mpra.config import TrainingConfig
+from insilico_mpra.models.lightning_module import LitModel
+from insilico_mpra.data.datasets import HDF5Dataset
+from insilico_mpra.data.utils import create_test_dataloader
+from insilico_mpra.utils.dna_utils import Seq2Tensor
 
 
 class SequenceDataset(Dataset):
@@ -158,16 +158,18 @@ def predict_from_onehot(model, onehot, batch_size=1024, num_workers=4):
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=True    )
+        pin_memory=True,
+    )
 
     # Setup trainer for prediction
     trainer = pl.Trainer(
         accelerator='gpu' if torch.cuda.is_available() else 'cpu',
-        devices='cuda' if torch.cuda.is_available() else 1,
+        devices='auto', # 'cuda' if torch.cuda.is_available() else 1,
         precision='16-mixed' if torch.cuda.is_available() else 32,
         logger=False,
         enable_checkpointing=False,
-        enable_progress_bar=True
+        enable_progress_bar=False,
+        enable_model_summary=False,
     )
 
     # Get predictions
@@ -179,7 +181,7 @@ def predict_from_onehot(model, onehot, batch_size=1024, num_workers=4):
 
 def predict_with_reverse_complement(model, onehot, batch_size=1024, num_workers=4):
     """Make predictions with test-time augmentation."""
-    from mpralegnet.utils.dna_utils import reverse_complement_array
+    from insilico_mpra.utils.dna_utils import reverse_complement_array
 
     # Forward predictions
     forward_preds = predict_from_onehot(model, onehot, batch_size, num_workers)
@@ -218,3 +220,35 @@ def save_predictions(predictions, output_path, sequences=None, targets=None):
     df = pd.DataFrame(data)
     df.to_csv(output_path, index=False)
     print(f"Predictions saved to: {output_path}")
+
+
+def predict_ensemble_from_onehot(models, onehot):
+    """
+    Parameters
+    ----------
+    models: list[pl.LightningModule]   pre-loaded models
+    onehot: np.ndarray | torch.Tensor  shape (N, C, L)
+
+    Returns
+    -------
+    np.ndarray   ensemble-averaged predictions for the input
+    """
+    # 1 -- device & mixed-precision context
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # 2 -- prepare input  (add batch-dim, move to device)
+    x = torch.as_tensor(onehot, dtype=torch.float32, device=device)
+
+    # 3 -- run every model, collect outputs
+    preds = []
+    with torch.no_grad():
+        for model in models:
+            model = model.to(device).eval()
+            if hasattr(model, "predict_step"):
+                y = model.predict_step(x, 0)
+            else:
+                y = model(x)
+            preds.append(y.detach().cpu())
+
+    # 4 -- average and return numpy
+    return torch.mean(torch.stack(preds), dim=0).numpy()
