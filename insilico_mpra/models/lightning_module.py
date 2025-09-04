@@ -5,18 +5,19 @@ PyTorch Lightning module for MPRA LegNet training and validation.
 
 import torch
 import torch.nn as nn
-import lightning.pytorch as pl
+# import lightning.pytorch as pl
+import pytorch_lightning as pl
 from torchmetrics import PearsonCorrCoef
 from ..utils.model_utils import initialize_weights
 
 
 class LitModel(pl.LightningModule):
     """PyTorch Lightning module for LegNet training."""
-    
+
     def __init__(self, tr_cfg):
         """
         Initialize Lightning module.
-        
+
         Args:
             tr_cfg: TrainingConfig object with model and training parameters
         """
@@ -26,7 +27,7 @@ class LitModel(pl.LightningModule):
         self.model.apply(initialize_weights)
         self.loss = nn.MSELoss()
         self.val_pearson = PearsonCorrCoef()
-        
+
         # Save hyperparameters
         self.save_hyperparameters({"config": self.tr_cfg.to_dict()})
 
@@ -72,7 +73,7 @@ class LitModel(pl.LightningModule):
             lr=self.tr_cfg.max_lr / 25,
             weight_decay=self.tr_cfg.weight_decay
         )
-        
+
         lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
             optimizer,
             max_lr=self.tr_cfg.max_lr,
@@ -88,10 +89,10 @@ class LitModel(pl.LightningModule):
             "frequency": 1,
             "name": "cycle_lr"
         }]
-    
+
     def on_train_epoch_end(self):
         """Called at the end of each training epoch."""
         # Log learning rate
         if self.trainer.optimizers:
             current_lr = self.trainer.optimizers[0].param_groups[0]['lr']
-            self.log('lr', current_lr, on_epoch=True) 
+            self.log('lr', current_lr, on_epoch=True)

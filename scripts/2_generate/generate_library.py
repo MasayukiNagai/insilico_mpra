@@ -148,7 +148,7 @@ def main_tsv():
     outdir = args.outdir
     outdir.mkdir(parents=True, exist_ok=True)
 
-    df = pd.read_csv(intsv, sep='\t')
+    df = pd.read_csv(intsv, sep='\t', index_col=0)
 
     # Load models
     print("Loading models...")
@@ -182,6 +182,7 @@ def main_tsv():
         with h5py.File(outfile, 'w') as f:
             f.create_dataset('x', data=x_mut)
             f.create_dataset('y', data=y_mut)
+        print(f'Saved {outfile}')
 
         # Save figure
         fig = plot_y_hist(y_mut)
