@@ -1,45 +1,44 @@
 import argparse
 import h5py
+import warnings
 import torch
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
-from squid.mutagenizer import RandomMutagenesis
-from squid.predictor import ScalarPredictor
-from squid.mave import InSilicoMAVE
-from squid.impress import plot_y_hist
 
-from insilico_mpra.predict import load_model, predict_ensemble_from_onehot
+
+from insilico_mpra.generate import generate_mutagenesis_library, add_adapters
+from insilico_mpra.predict import load_models
 from insilico_mpra.utils.dna_utils import seq2onehot
 
-torch.set_float32_matmul_precision('medium')
+
+torch.set_float32_matmul_precision("medium")
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Train model")
-    g = parser.add_mutually_exclusive_group(required=True)
-    g.add_argument(
-        "--input_tsv", "-t", type=Path,
-        help="Input TSV file containing sequences to mutagenize.")
-    g.add_argument(
-        "--input_fasta", "-f", type=Path,
-        help="Input FASTA file containing sequences to mutagenize.")
+    parser = argparse.ArgumentParser(description="Generate mutagenesis library")
+    parser.add_argument(
+        "--input", "-t", type=Path, required=True,
+        help="Path to input file (tsv, csv, fasta) containing sequences to mutagenize.")
+    parser.add_argument(
+        "--format", "-f", type=str, choices=["tsv", "csv", "fasta"], default="tsv",
+        help="Format of the input file (tsv, csv, fasta). Default is 'tsv'.")
     parser.add_argument(
         "--weights_dir", "-d", type=Path, required=True,
         help="Path to the weight directory where checkpoints are stored.")
     parser.add_argument(
+        "--config_path", "-c", type=Path, default=None,
+        help=("Path to the model configuration JSON file. "
+              "If not provided, defaults to 'config.json' in weights_dir."))
+    parser.add_argument(
         "--mut_rate", "-m", type=float, default=0.1,
-        help="Mutation rate for the mutagenesis process.")
+        help="Mutation rate for the mutagenesis process. Default is 0.1.")
     parser.add_argument(
         "--num", "-n", type=int, default=1000,
-        help="Number of sequences to generate.")
+        help="Number of sequences to generate. Default is 1000.")
     parser.add_argument(
         "--batch_size", "-b", type=int, default=1024,
-        help="Batch size for prediction.")
-    parser.add_argument(
-        "--num_workers", "-w", type=int, default=4,
-        help="Number of workers for data loading.")
+        help="Batch size for prediction. Default is 1024.")
     parser.add_argument(
         "--outdir", "-o", type=Path, default=Path("output"),
         help="Output directory to save the generated mutagenesis library.")
@@ -53,198 +52,142 @@ def read_fasta(path):
         for line in fh:
             line = line.rstrip()
             if not line:
-                continue                         # skip blank lines
-            if line[0] == ">":                   # new header
-                if hdr is not None:              # save previous record
+                continue  # skip blank lines
+            if line[0] == ">":  # new header
+                if hdr is not None:  # save previous record
                     records[hdr] = "".join(seq_parts)
-                hdr = line[1:].split()[0]        # drop leading ">" + trim extras
+                hdr = line[1:].split()[0]  # drop leading ">" + trim extras
                 seq_parts = []
             else:
                 seq_parts.append(line)
-        if hdr is not None:                      # flush last record
+        if hdr is not None:  # flush last record
             records[hdr] = "".join(seq_parts)
     return records
 
 
-def load_models(weights_dir, num_models=10):
-    models = []
-    for i in range(num_models):
-        model_path = Path(weights_dir) / str(i) / 'best.ckpt'
-        config_path = Path(weights_dir) / str(i) / 'config.json'
-        if model_path.exists() and config_path.exists():
-            model, _ = load_model(config_path, model_path)
-            models.append(model)
+def get_onehot_dict(input_path: Path | str, format: str = "fasta"):
+    if format not in ["tsv", "csv", "fasta"]:
+        raise ValueError(
+            f"Unsupported data format: {format}. Supported formats are 'tsv', 'csv', and 'fasta'."
+        )
+
+    onehot_dict = {}
+    if format in ["tsv", "csv"]:
+        if format == "tsv":
+            df = pd.read_csv(input_path, sep="\t")
         else:
-            raise FileNotFoundError(
-                f"Model or config file not found for model {i} at {model_path} or {config_path}")
-    return models
+            df = pd.read_csv(input_path)
+
+        use_header = "header" in df.columns and df["header"].notna().all()
+
+        for i in range(len(df)):
+            seq = df.loc[i, "sequence"]
+            if len(seq) != 200:
+                warnings.warn(f"Sequence at index {i} is not of length 200. Skipping.", UserWarning)
+                continue
+            seq_with_adapters = add_adapters(seq)
+            key = df.loc[i, "header"] if use_header else f"mpra{i}"
+            onehot_dict[key] = seq2onehot(seq_with_adapters).transpose(1, 0)
+    else:  # fasta format
+        fasta_dict = read_fasta(input_path)
+        for key, seq in fasta_dict.items():
+            if len(seq) != 200:
+                raise ValueError(f"Sequence {key} is not of length 200.")
+            seq_with_adapters = add_adapters(seq)
+            onehot_dict[key] = seq2onehot(seq_with_adapters).transpose(1, 0)
+
+    return onehot_dict
 
 
-def add_adapters(sequence):
-    adapter5 = 'AGGACCGGATCAACT'
-    adapter3 = 'CATTGCGTGAACCGA'
-    return adapter5 + sequence + adapter3
-
-
-def generate_mutagenesis_library(
-    x: np.ndarray,
-    models,
-    num=10_000,
-    mut_rate=0.1,
-    batch_size=1024,
-    mut_window=[15, 215]
-):
-    """
-    Generate a mutagenesis library using the provided models and mutation rate.
+def plot_y_hist(y_mut):
+    """Function for visualizing histogram of inferred predictions for MAVE dataset.
 
     Parameters
     ----------
-    x : np.ndarray (L, 4)
-        Input sequence in one-hot encoded format.
-    models : list of torch.nn.Module
-        List of pre-trained models to use for predictions.
-    num : int
-        Number of sequences to generate.
-    mut_rate : float
-        Mutation rate for the mutagenesis process.
-    batch_size : int
-        Batch size for processing the input sequences.
+    y_mut : numpy.ndarray
+        Inferred predictions for sequences (shape: (N,1)).
+
+    Returns
+    -------
+    matplotlib.pyplot.Figure
     """
-    mut_generator = RandomMutagenesis(mut_rate=mut_rate)
-
-    ensemble_fun = lambda x: predict_ensemble_from_onehot(
-        models=models,
-        onehot=x.transpose(0, 2, 1),
-    )
-    mut_predictor = ScalarPredictor(
-        pred_fun=ensemble_fun,
-        batch_size=batch_size
-    )
-
-    mave = InSilicoMAVE(
-        mut_generator=mut_generator,
-        mut_predictor=mut_predictor,
-        seq_length=x.shape[0],
-        mut_window=mut_window,
-    )
-
-    x_mut, y_mut = mave.generate(x, num_sim=num)
-
-    return x_mut, y_mut
+    # plot histogram of transformed deepnet predictions
+    fig, ax = plt.subplots()
+    ax.hist(y_mut, bins=100)
+    ax.set_xlabel('y')
+    ax.set_ylabel('Frequency')
+    ax.axvline(y_mut[0], c='red', label='WT', linewidth=2, zorder=10) #wild-type prediction
+    plt.legend(loc='upper right')
+    plt.tight_layout()
+    return fig
 
 
-def main_tsv():
-    print("Starting mutagenesis library generation...")
-    args = parse_args()
+def main(
+    infile: Path,
+    format: str,
+    weights_dir: Path,
+    config_path: Path | None,
+    outdir: Path,
+    mut_rate: float,
+    num: int,
+    batch_size: int,
+):
+    print("===== Starting mutagenesis library generation =====")
+    if not infile.exists():
+        raise FileNotFoundError(f"Input TSV file {infile} does not exist.")
 
-    intsv = args.input_tsv
-    if not intsv.exists():
-        raise FileNotFoundError(f"Input TSV file {intsv} does not exist.")
-
-    weights_dir = args.weights_dir
+    weights_dir = weights_dir
     if not weights_dir.exists():
         raise FileNotFoundError(f"Weight directory {weights_dir} does not exist.")
 
-    outdir = args.outdir
+    outdir = outdir
     outdir.mkdir(parents=True, exist_ok=True)
 
-    df = pd.read_csv(intsv, sep='\t', index_col=0)
+    # Prepare the sequences
+    print("====== Loading sequences from TSV file ======")
+    onehot_dict = get_onehot_dict(infile, format=format)
 
     # Load models
-    print("Loading models...")
-    models = load_models(weights_dir, num_models=10)
+    print("====== Loading models ======")
+    if config_path is None:
+        config_path = weights_dir / "config.json"
+        if not config_path.exists():
+            raise FileNotFoundError(
+                f"Config file not provided and config.json not found in {weights_dir}."
+            )
+    models = load_models(config_path, weights_dir)
 
-    # Prepare the sequence
-    onehot_dict = {}
-    for i in df.index:
-        seq = df.loc[i, 'sequence']
-        assert len(seq) == 200, f"Sequence at index {i} is not of length 200."
-        seq_with_adapters = add_adapters(seq)
-        onehot_dict[i] = seq2onehot(seq_with_adapters).transpose(1, 0)
-
-    # Generate mutagenesis library
-    print("Generating mutagenesis library...")
-    for i, onehot_seq in onehot_dict.items():
-        print(f"Processing sequence {i}...")
+    print("====== Generating mutagenesis library ======")
+    for key, onehot_seq in onehot_dict.items():
+        print(f'----- Processing sequence "{key}" -----')
         x_mut, y_mut = generate_mutagenesis_library(
-            x=onehot_seq,
-            models=models,
-            num=args.num,
-            mut_rate=args.mut_rate,
-            batch_size=args.batch_size
+            x=onehot_seq, models=models, num=num, mut_rate=mut_rate, batch_size=batch_size
         )
 
         # chrom_start_end.h5
-        chrom = df.loc[i, 'chrom']
-        start = df.loc[i, 'start']
-        end = df.loc[i, 'end']
-        outfile = outdir / f'{chrom}_{start}_{end}.h5'
-        with h5py.File(outfile, 'w') as f:
-            f.create_dataset('x', data=x_mut)
-            f.create_dataset('y', data=y_mut)
-        print(f'Saved {outfile}')
+        outfile = outdir / f"{key}.h5"
+        with h5py.File(outfile, "w") as f:
+            f.create_dataset("x", data=x_mut)
+            f.create_dataset("y", data=y_mut)
+        print(f"Saved {outfile}")
 
         # Save figure
         fig = plot_y_hist(y_mut)
-        fig.savefig(outfile.with_suffix('.png'), dpi=300)
+        fig.savefig(outfile.with_suffix(".png"), dpi=300)
         plt.close(fig)
 
-def main_fasta():
-    print("Starting mutagenesis library generation...")
-    args = parse_args()
-
-    infasta = args.input_fasta
-    if not infasta.exists():
-        raise FileNotFoundError(f"Input fasta file {infasta} does not exist.")
-
-    weights_dir = args.weights_dir
-    if not weights_dir.exists():
-        raise FileNotFoundError(f"Weight directory {weights_dir} does not exist.")
-
-    outdir = args.outdir
-    outdir.mkdir(parents=True, exist_ok=True)
-
-    # Load sequences from fasta file
-    print("Loading sequences from fasta file...")
-    fasta_dict = read_fasta(infasta)
-
-    # Load models
-    print("Loading models...")
-    models = load_models(weights_dir, num_models=10)
-
-    # Prepare the sequence
-    onehot_dict = {}
-    for k, seq in fasta_dict.items():
-        assert len(seq) == 200, f"Sequence {k} is not of length 200."
-        seq_with_adapters = add_adapters(seq)
-        onehot_dict[k] = seq2onehot(seq_with_adapters).transpose(1, 0)  # (L, 4)
-
-    # Generate mutagenesis library
-    print("Generating mutagenesis library...")
-    for k, onehot_seq in onehot_dict.items():
-        print(f"Processing sequence {k}...")
-        x_mut, y_mut = generate_mutagenesis_library(
-            x=onehot_seq,
-            models=models,
-            num=args.num,
-            mut_rate=args.mut_rate,
-            batch_size=args.batch_size
-        )
-
-        output_file = outdir / f"{k}.h5"
-        with h5py.File(output_file, 'w') as f:
-            f.create_dataset('x', data=x_mut)
-            f.create_dataset('y', data=y_mut)
-
-        # Save figure
-        fig = plot_y_hist(y_mut)
-        fig.savefig(output_file.with_suffix('.png'), dpi=300)
-        plt.close(fig)
+    print("===== Mutagenesis library generation completed =====")
 
 
 if __name__ == "__main__":
     args = parse_args()
-    if args.input_tsv:
-        main_tsv()
-    elif args.input_fasta:
-        main_fasta()
+    main(
+        infile=args.input,
+        format=args.format,
+        weights_dir=args.weights_dir,
+        config_path=args.config_path,
+        outdir=args.outdir,
+        mut_rate=args.mut_rate,
+        num=args.num,
+        batch_size=args.batch_size,
+    )

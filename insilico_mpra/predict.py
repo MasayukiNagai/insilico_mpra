@@ -73,6 +73,26 @@ def load_model(config_path, checkpoint_path):
     return model, config
 
 
+def load_models(config_path: Path | str, weights_dir: Path | str):
+    """
+    Assumes the same config for all models in the ensemble.
+    """
+    weights_dir = Path(weights_dir)
+    config_path = Path(config_path)
+    if not weights_dir.exists():
+        raise FileNotFoundError(f"Weight directory {weights_dir} does not exist.")
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file {config_path} does not exist.")
+
+    models = []
+    ckpts = list(weights_dir.glob("*.ckpt"))
+    for ckpt in ckpts:
+        print(f"Loading model from {ckpt}")
+        model, _ = load_model(config_path, ckpt)
+        models.append(model)
+    return models
+
+
 def load_sequences_from_file(file_path):
     """Load sequences from text file."""
     sequences = []
