@@ -1,5 +1,5 @@
 # In silico MPRA
-This repository provides tools to generate dense in‑silico MPRA libraries with predicted activities using MPRALegNet. Given one or more 200‑bp DNA sequences, the package applies random mutagenesis at a user‑specified rate, scores all generated variants with MPRALegNet, and saves results.
+This repository provides tools to generate dense in‑silico MPRA libraries with predicted activities using [MPRALegNet](https://github.com/autosome-ru/human_legnet). Given one or more 200‑bp DNA sequences, the package applies random mutagenesis at a user‑specified rate, scores all generated variants with MPRALegNet, and saves results.
 
 Key features
 - Create dense perturbation libraries from TSV or FASTA inputs (sequences must be 200 bp).
@@ -64,18 +64,11 @@ python generate_library.py \
   --num 30000
 ```
 
-python ./scripts/2_generate/generate_library.py \
-  --input /grid/koo/home/shared/clg_procap/data/mpra/250810/K562_fold1_train_selected.tsv \
-  --weights_dir ./model_weight \
-  --outdir ./tmp_out \
-  --mut_rate 0.15 \
-  --num 3000
-
-This outputs
+The outputs will be saved as follows:
 ```
 outdir
-├── header1.h5  #
-├── header1.png  # histogram of distributions
+├── header1.h5
+├── header1.png  # histogram that shows distributions of activities
 ├── header2.h5
 ├── header2.png
 ...
@@ -96,6 +89,11 @@ with h5py.File(path, "r") as f:
 
 print(x.shape, y.shape)
 ```
+
+## TODOs
+- Data processing for the training data
+- Output sequences in ACTG instead of numpy arrays?
+- Loosen the dependencies (the current implementation strictly follows the original implementation)
 
 ## Authors
 * Masayuki Nagai
