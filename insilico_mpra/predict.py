@@ -1,8 +1,8 @@
 import torch
 import numpy as np
 import pandas as pd
-# import lightning.pytorch as pl
-import pytorch_lightning as pl
+import lightning.pytorch as pl
+# import pytorch_lightning as pl
 from pathlib import Path
 from torch.utils.data import DataLoader, Dataset
 

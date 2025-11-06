@@ -5,8 +5,8 @@ PyTorch Lightning module for MPRA LegNet training and validation.
 
 import torch
 import torch.nn as nn
-# import lightning.pytorch as pl
-import pytorch_lightning as pl
+import lightning.pytorch as pl
+# import pytorch_lightning as pl
 from torchmetrics import PearsonCorrCoef
 from ..utils.model_utils import initialize_weights
 

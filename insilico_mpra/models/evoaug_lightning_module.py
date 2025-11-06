@@ -7,10 +7,9 @@ evolution-inspired data augmentations with Lightning training workflows.
 """
 
 import torch
-# import lightning.pytorch as pl
-import pytorch_lightning as pl
+import lightning.pytorch as pl
+# import pytorch_lightning as pl
 import numpy as np
-
 
 # EvoAug imports (conditional to avoid hard dependency)
 try:
