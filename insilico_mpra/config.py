@@ -13,7 +13,7 @@ from typing import Optional, Tuple, List, Union
 @dataclass
 class TrainingConfig:
     """Configuration class for training MPRA LegNet models."""
-    
+
     # Model architecture parameters
     stem_ch: int
     stem_ks: int
@@ -21,27 +21,27 @@ class TrainingConfig:
     ef_block_sizes: List[int]
     resize_factor: int
     pool_sizes: List[int]
-    
+
     # Data augmentation parameters
     reverse_augment: bool
     use_reverse_channel: bool
     use_shift: bool
     max_shift: Optional[Tuple[int, int]]
-    
+
     # Training parameters
     max_lr: float
     weight_decay: float
     epoch_num: int
     train_batch_size: int
     valid_batch_size: int
-    
+
     # System parameters
     model_dir: str
     data_path: str
     device: int
     seed: int
     num_workers: int
-    
+
     # Internal parameter
     training: InitVar[bool] = True
 
@@ -55,8 +55,8 @@ class TrainingConfig:
 
     def check_params(self):
         """Validate configuration parameters."""
-        if Path(self.model_dir).exists():
-            print(f"Warning: model dir already exists: {self.model_dir}")
+        # if Path(self.model_dir).exists():
+        #     print(f"Warning: model dir already exists: {self.model_dir}")
         if not self.reverse_augment:
             if self.use_reverse_channel:
                 raise Exception("If model uses reverse channel, reverse augmentation must be performed")
@@ -133,4 +133,4 @@ def get_default_config() -> TrainingConfig:
         valid_batch_size=1024,
         num_workers=8,
         training=True
-    ) 
+    )
