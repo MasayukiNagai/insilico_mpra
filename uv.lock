@@ -978,7 +978,7 @@ requires-dist = [
     { name = "seaborn", specifier = ">=0.11.0" },
     { name = "squid-nn", specifier = ">=0.4.8" },
     { name = "torch", specifier = "==2.5.1" },
-    { name = "torchmetrics", specifier = "==0.11.4" },
+    { name = "torchmetrics", specifier = ">=0.11.4" },
 ]
 
 [package.metadata.requires-dev]

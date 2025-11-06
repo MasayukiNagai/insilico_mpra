@@ -1,7 +1,7 @@
 [project]
 name = "insilico_mpra"
 version = "0.1.0"
-description = "Add your description here"
+description = "In silico MPRA using MPRALegNet"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -15,7 +15,7 @@ dependencies = [
     "seaborn>=0.11.0",
     "squid-nn>=0.4.8",
     "torch==2.5.1",
-    "torchmetrics==0.11.4",
+    "torchmetrics>=0.11.4",
 ]
 
 [dependency-groups]
